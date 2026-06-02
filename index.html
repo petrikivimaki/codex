@@ -1,0 +1,213 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Codex Data Explorer</title>
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        />
+        <link
+            rel="stylesheet"
+            href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
+        />
+        <link rel="stylesheet" href="styles/main.css" />
+        <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+        <script type="module" src="src/app.js"></script>
+    </head>
+    <body>
+        <div class="app-layout">
+            <aside class="sidebar" aria-label="Dataset navigation">
+                <div class="sidebar__panel">
+                    <div class="sidebar__brand">
+                        <div class="brand-mark" aria-hidden="true">
+                            <i class="fa-solid fa-database"></i>
+                        </div>
+                        <div>
+                            <p class="eyebrow" id="brand-title">Codex</p>
+                            <h1 id="brand-subtitle">Open Data for All</h1>
+                        </div>
+                    </div>
+                    <section class="search-panel" aria-label="Dataset library">
+                        <form class="search-box" role="search">
+                            <label class="visually-hidden" for="dataset-search"
+                                >Search datasets</label
+                            >
+                            <i
+                                class="fa-solid fa-magnifying-glass"
+                                aria-hidden="true"
+                            ></i>
+                            <input
+                                id="dataset-search"
+                                name="dataset-search"
+                                type="search"
+                                autocomplete="off"
+                                placeholder="Search datasets, topics, formats, places"
+                            />
+                        </form>
+                        <div
+                            class="suggestions"
+                            id="dataset-suggestions"
+                            role="listbox"
+                            aria-label="Dataset suggestions"
+                        ></div>
+                    </section>
+                </div>
+
+                <nav class="sidebar-rail" aria-label="Application toolbar">
+                    <button
+                        class="rail-button"
+                        id="toggle-sidebar-button"
+                        type="button"
+                        aria-expanded="true"
+                        aria-label="Collapse dataset sidebar"
+                        title="Collapse dataset sidebar"
+                    >
+                        <span
+                            class="sidebar-toggle-icon"
+                            aria-hidden="true"
+                        ></span>
+                    </button>
+                    <button
+                        class="rail-button"
+                        id="theme-toggle-button"
+                        type="button"
+                        aria-label="Switch to dark theme"
+                        title="Switch to dark theme"
+                    >
+                        <i class="fa-solid fa-moon" aria-hidden="true"></i>
+                    </button>
+                    <a
+                        class="rail-button"
+                        id="repository-link"
+                        href="https://github.com/"
+                        aria-label="View data repository"
+                        title="View data repository"
+                    >
+                        <i class="fa-brands fa-github" aria-hidden="true"></i>
+                    </a>
+                </nav>
+            </aside>
+
+            <main class="content" aria-live="polite">
+                <section class="dataset-card title-card">
+                    <div class="dataset-toolbar">
+                        <div>
+                            <p class="eyebrow" id="active-dataset-category">
+                                Loading
+                            </p>
+                            <h2 id="active-dataset-name">Preparing datasets</h2>
+                        </div>
+                        <div class="dataset-toolbar__actions">
+                            <button
+                                class="secondary-button bookmark-button icon-action-button"
+                                id="bookmark-button"
+                                type="button"
+                                aria-pressed="false"
+                                aria-label="Bookmark dataset"
+                                title="Bookmark dataset"
+                            >
+                                <i
+                                    class="fa-regular fa-bookmark"
+                                    aria-hidden="true"
+                                ></i>
+                            </button>
+                            <a
+                                class="secondary-button"
+                                id="source-json-link"
+                                href="#"
+                                target="_blank"
+                                rel="noopener"
+                            >
+                                <i
+                                    class="fa-brands fa-github"
+                                    aria-hidden="true"
+                                ></i>
+                                <span>Source</span>
+                            </a>
+                            <a
+                                class="primary-button"
+                                id="download-json-link"
+                                href="#"
+                                download
+                            >
+                                <i
+                                    class="fa-solid fa-file-arrow-down"
+                                    aria-hidden="true"
+                                ></i>
+                                <span>JSON</span>
+                            </a>
+                        </div>
+                    </div>
+
+                    <div class="status-bar">
+                        <div class="status-pill">
+                            <i
+                                class="fa-solid fa-layer-group"
+                                aria-hidden="true"
+                            ></i>
+                            <span id="dataset-count">0 rows</span>
+                        </div>
+                        <div class="status-pill">
+                            <i
+                                class="fa-solid fa-clock-rotate-left"
+                                aria-hidden="true"
+                            ></i>
+                            <span id="dataset-updated">Updated unknown</span>
+                        </div>
+                        <div class="status-pill">
+                            <i
+                                class="fa-solid fa-code-branch"
+                                aria-hidden="true"
+                            ></i>
+                            <span id="dataset-source">Local</span>
+                        </div>
+                    </div>
+                </section>
+
+                <section
+                    class="dataset-card detail-section"
+                    id="metadata-panel"
+                    aria-label="Metadata"
+                >
+                    <div class="metadata-grid" id="metadata-grid"></div>
+                </section>
+
+                <section
+                    class="dataset-card detail-section"
+                    id="table-panel"
+                    aria-label="Data table"
+                >
+                    <div class="table-controls">
+                        <label class="visually-hidden" for="row-filter"
+                            >Filter rows</label
+                        >
+                        <input
+                            id="row-filter"
+                            type="search"
+                            autocomplete="off"
+                            placeholder="Filter rows"
+                        />
+                        <span id="row-filter-count">0 matching rows</span>
+                    </div>
+                    <div class="data-table-wrap">
+                        <table class="data-table" id="data-table"></table>
+                    </div>
+                </section>
+
+                <section
+                    class="dataset-card detail-section"
+                    id="map-section"
+                    aria-label="Map"
+                    hidden
+                >
+                    <div class="map-canvas" id="map-canvas"></div>
+                    <p class="empty-state" id="map-empty-state" hidden>
+                        This dataset does not include coordinate fields.
+                    </p>
+                </section>
+            </main>
+        </div>
+    </body>
+</html>

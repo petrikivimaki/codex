@@ -1,0 +1,15 @@
+{
+  "title": "Codex | Open Data for All",
+  "brandTitle": "Codex",
+  "brandSubtitle": "Open Data for All",
+  "defaultDatasetId": "swiss-cantons",
+  "dataMode": "remote",
+  "indexPath": "index.json",
+  "dataPath": "data",
+  "defaultTheme": "light",
+  "remote": {
+    "owner": "petrikivimaki",
+    "repo": "codex-data",
+    "branch": "master"
+  }
+}
