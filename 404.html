@@ -1,0 +1,47 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="utf-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1" />
+        <title>Page Not Found | Codex</title>
+        <meta
+            name="description"
+            content="The requested Codex page could not be found."
+        />
+        <meta name="robots" content="noindex" />
+        <meta name="color-scheme" content="light dark" />
+        <link
+            rel="stylesheet"
+            href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
+        />
+        <link rel="stylesheet" href="styles/main.css?v=16" />
+        <script type="module" src="src/not-found.js?v=1"></script>
+    </head>
+    <body>
+        <main class="not-found-page">
+            <section class="dataset-card not-found-card" aria-labelledby="not-found-title">
+                <p class="eyebrow">404</p>
+                <h1 id="not-found-title">Page not found</h1>
+                <p>
+                    This Codex route does not exist. If the path looks like a dataset
+                    identifier, try opening it as a dataset hash instead.
+                </p>
+                <div class="not-found-actions">
+                    <a class="primary-button" id="not-found-home-link" href="./">
+                        <i class="fa-solid fa-house" aria-hidden="true"></i>
+                        <span>Open Codex</span>
+                    </a>
+                    <a
+                        class="secondary-button"
+                        id="dataset-hash-link"
+                        href="./"
+                        hidden
+                    >
+                        <i class="fa-solid fa-arrow-turn-up" aria-hidden="true"></i>
+                        <span id="dataset-hash-label">Try dataset link</span>
+                    </a>
+                </div>
+            </section>
+        </main>
+    </body>
+</html>

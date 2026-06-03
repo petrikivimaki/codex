@@ -1,10 +1,12 @@
-import { getDatasetCdnUrl, getDatasetSourceUrl, getRepositoryUrl, loadConfig } from "./config.js?v=6";
+import { getDatasetCdnUrl, getDatasetSourceUrl, getRepositoryDataUrl, loadConfig } from "./config.js?v=8";
+import { getDefaultChartFields, renderChart } from "./chart-view.js?v=2";
 import { filterDatasets, filterRows, findDatasetById, loadDataset, loadDatasetIndex } from "./data-service.js?v=6";
 import { selectElement } from "./dom.js";
 import { hasCoordinateRows, renderMap } from "./map-view.js";
-import { renderMetadata, renderSuggestions, renderTable } from "./render.js?v=5";
+import { renderMetadata, renderPeriodicTable, renderSuggestions, renderTable } from "./render.js?v=8";
 
 const bookmarksStorageKey = "codex.bookmarkedDatasetIds";
+const contentWidthStorageKey = "codex.contentWidth";
 const themeStorageKey = "codex.theme";
 
 const state = {
@@ -14,16 +16,23 @@ const state = {
 	activeData: null,
 	expandedDatasetId: "",
 	bookmarkedDatasetIds: new Set(),
-	filteredRows: []
+	filteredRows: [],
+	chartFields: {
+		xField: "",
+		yField: "",
+		zField: ""
+	}
 };
 
 const elements = {
 	brandTitle: selectElement("#brand-title"),
 	brandSubtitle: selectElement("#brand-subtitle"),
 	searchInput: selectElement("#dataset-search"),
+	searchCount: selectElement("#dataset-search-count"),
 	suggestions: selectElement("#dataset-suggestions"),
 	toggleSidebarButton: selectElement("#toggle-sidebar-button"),
 	themeToggleButton: selectElement("#theme-toggle-button"),
+	contentWidthToggleButton: selectElement("#content-width-toggle-button"),
 	repositoryLink: selectElement("#repository-link"),
 	activeCategory: selectElement("#active-dataset-category"),
 	activeName: selectElement("#active-dataset-name"),
@@ -33,13 +42,20 @@ const elements = {
 	sourceJsonLink: selectElement("#source-json-link"),
 	downloadJsonLink: selectElement("#download-json-link"),
 	bookmarkButton: selectElement("#bookmark-button"),
+	copyDatasetLinkButton: selectElement("#copy-dataset-link-button"),
 	metadataGrid: selectElement("#metadata-grid"),
 	rowFilter: selectElement("#row-filter"),
 	rowFilterCount: selectElement("#row-filter-count"),
 	dataTable: selectElement("#data-table"),
+	graphControls: selectElement("#graph-controls"),
+	graphCanvas: selectElement("#graph-canvas"),
+	graphEmptyState: selectElement("#graph-empty-state"),
+	periodicTableSection: selectElement("#periodic-table-section"),
+	periodicTable: selectElement("#periodic-table"),
 	mapSection: selectElement("#map-section"),
 	mapCanvas: selectElement("#map-canvas"),
-	mapEmptyState: selectElement("#map-empty-state")
+	mapEmptyState: selectElement("#map-empty-state"),
+	scrollTopButton: selectElement("#scroll-top-button")
 };
 
 /**
@@ -55,6 +71,7 @@ async function startApp() {
 		state.config = await loadConfig();
 		applyBranding({ config: state.config });
 		applyInitialTheme({ config: state.config });
+		applyInitialContentWidth();
 		updateRepositoryLink({ config: state.config });
 		loadBookmarkedDatasetIds();
 		state.datasets = await loadDatasetIndex({ config: state.config });
@@ -97,7 +114,7 @@ function applyBranding({ config }) {
  * @returns {void}
  */
 function updateRepositoryLink({ config }) {
-	elements.repositoryLink.href = getRepositoryUrl({ config });
+	elements.repositoryLink.href = getRepositoryDataUrl({ config });
 }
 
 /**
@@ -109,8 +126,12 @@ function bindEvents() {
 	elements.searchInput.addEventListener("input", handleSearchInput);
 	elements.toggleSidebarButton.addEventListener("click", handleToggleSidebarClick);
 	elements.themeToggleButton.addEventListener("click", handleThemeToggleClick);
+	elements.contentWidthToggleButton.addEventListener("click", handleContentWidthToggleClick);
 	elements.rowFilter.addEventListener("input", handleRowFilterInput);
+	elements.graphControls.addEventListener("change", handleGraphControlsChange);
 	elements.bookmarkButton.addEventListener("click", handleBookmarkClick);
+	elements.copyDatasetLinkButton.addEventListener("click", handleCopyDatasetLinkClick);
+	elements.scrollTopButton.addEventListener("click", handleScrollTopClick);
 }
 
 /**
@@ -145,12 +166,44 @@ function handleThemeToggleClick() {
 }
 
 /**
+ * Handles content width toggle clicks.
+ *
+ * @returns {void}
+ */
+function handleContentWidthToggleClick() {
+	const nextContentWidth = getCurrentContentWidth() === "full" ? "centered" : "full";
+
+	applyContentWidth({ contentWidth: nextContentWidth });
+	localStorage.setItem(contentWidthStorageKey, nextContentWidth);
+}
+
+/**
  * Handles row filter input.
  *
  * @returns {void}
  */
 function handleRowFilterInput() {
 	renderFilteredRows();
+}
+
+/**
+ * Handles graph control changes.
+ *
+ * @param {Event} event Change event.
+ * @returns {void}
+ */
+function handleGraphControlsChange(event) {
+	const target = event.target;
+
+	if (!(target instanceof HTMLSelectElement)) {
+		return;
+	}
+
+	state.chartFields = {
+		...state.chartFields,
+		[target.name]: target.value
+	};
+	renderActiveGraph();
 }
 
 /**
@@ -169,12 +222,42 @@ function handleBookmarkClick() {
 }
 
 /**
+ * Handles copy dataset link button clicks.
+ *
+ * @async
+ * @returns {Promise<void>}
+ */
+async function handleCopyDatasetLinkClick() {
+	if (!state.activeDataset) {
+		return;
+	}
+
+	await copyText({ text: getActiveDatasetPageUrl() });
+	updateCopyDatasetLinkButton({ isCopied: true });
+	window.setTimeout(resetCopyDatasetLinkButton, 1400);
+}
+
+/**
+ * Handles scroll-to-top button clicks.
+ *
+ * @returns {void}
+ */
+function handleScrollTopClick() {
+	window.scrollTo({
+		top: 0,
+		behavior: "smooth"
+	});
+}
+
+/**
  * Renders sidebar dataset entries.
  *
  * @returns {void}
  */
 function renderDatasetLists() {
 	const matches = getSidebarDatasets({ query: elements.searchInput.value });
+
+	updateDatasetSearchCount({ count: matches.length });
 
 	renderSuggestions({
 		container: elements.suggestions,
@@ -184,6 +267,17 @@ function renderDatasetLists() {
 		onPreview: previewDataset,
 		onSelect: selectDataset
 	});
+}
+
+/**
+ * Updates the dataset search count.
+ *
+ * @param {object} params Parameters.
+ * @param {number} params.count Number of visible datasets.
+ * @returns {void}
+ */
+function updateDatasetSearchCount({ count }) {
+	elements.searchCount.textContent = String(count);
 }
 
 /**
@@ -211,6 +305,7 @@ async function selectDataset({ dataset }) {
 	state.activeData = await loadDataset({ dataset });
 	state.expandedDatasetId = "";
 	state.filteredRows = state.activeData.data;
+	state.chartFields = getDefaultChartFields({ rows: state.activeData.data });
 	elements.rowFilter.value = "";
 	updateUrlHash({ datasetId: dataset.id });
 	renderDatasetLists();
@@ -238,6 +333,7 @@ function renderActiveDataset() {
 	elements.downloadJsonLink.href = getDatasetCdnUrl({ config: state.config, dataset });
 	elements.downloadJsonLink.download = `${dataset.id}.json`;
 	updateBookmarkButton();
+	resetCopyDatasetLinkButton();
 
 	renderMetadata({
 		container: elements.metadataGrid,
@@ -262,6 +358,49 @@ function renderFilteredRows() {
 	renderTable({
 		table: elements.dataTable,
 		rows: state.filteredRows
+	});
+	renderActiveGraph();
+	renderActivePeriodicTable({
+		dataset: state.activeDataset,
+		rows: state.activeData?.data ?? []
+	});
+}
+
+/**
+ * Renders the active graph.
+ *
+ * @returns {void}
+ */
+function renderActiveGraph() {
+	renderChart({
+		controls: elements.graphControls,
+		canvas: elements.graphCanvas,
+		emptyState: elements.graphEmptyState,
+		rows: state.activeData?.data ?? [],
+		fields: state.chartFields
+	});
+}
+
+/**
+ * Renders or hides the periodic table section.
+ *
+ * @param {object} params Parameters.
+ * @param {object | null} params.dataset Dataset summary.
+ * @param {Array<object>} params.rows Dataset rows.
+ * @returns {void}
+ */
+function renderActivePeriodicTable({ dataset, rows }) {
+	const isElementsDataset = dataset?.id === "elements";
+
+	elements.periodicTableSection.hidden = !isElementsDataset;
+
+	if (!isElementsDataset) {
+		return;
+	}
+
+	renderPeriodicTable({
+		container: elements.periodicTable,
+		rows
 	});
 }
 
@@ -364,6 +503,97 @@ function updateBookmarkButton() {
 }
 
 /**
+ * Updates the copy dataset link button state.
+ *
+ * @param {object} params Parameters.
+ * @param {boolean} params.isCopied Whether the link was copied.
+ * @returns {void}
+ */
+function updateCopyDatasetLinkButton({ isCopied }) {
+	const icon = elements.copyDatasetLinkButton.querySelector("i");
+	const label = isCopied ? "Copied dataset link" : "Copy dataset link";
+
+	elements.copyDatasetLinkButton.setAttribute("aria-label", label);
+	elements.copyDatasetLinkButton.setAttribute("title", label);
+
+	if (icon) {
+		icon.className = isCopied ? "fa-solid fa-check" : "fa-solid fa-link";
+	}
+}
+
+/**
+ * Resets the copy dataset link button.
+ *
+ * @returns {void}
+ */
+function resetCopyDatasetLinkButton() {
+	updateCopyDatasetLinkButton({ isCopied: false });
+}
+
+/**
+ * Gets the active dataset page URL.
+ *
+ * @returns {string} Active dataset page URL.
+ */
+function getActiveDatasetPageUrl() {
+	const siteUrl = getConfiguredSiteUrl();
+	const datasetId = state.activeDataset?.id ?? "";
+
+	return `${siteUrl}#${encodeURIComponent(datasetId)}`;
+}
+
+/**
+ * Gets the configured public site URL.
+ *
+ * @returns {string} Public site URL.
+ */
+function getConfiguredSiteUrl() {
+	const siteUrl = String(state.config?.siteUrl ?? window.location.href).split("#")[0];
+
+	return siteUrl.endsWith("/") ? siteUrl : `${siteUrl}/`;
+}
+
+/**
+ * Copies text to the clipboard.
+ *
+ * @async
+ * @param {object} params Parameters.
+ * @param {string} params.text Text to copy.
+ * @returns {Promise<void>}
+ */
+async function copyText({ text }) {
+	if (navigator.clipboard) {
+		try {
+			await navigator.clipboard.writeText(text);
+			return;
+		} catch (error) {
+			copyTextWithTextArea({ text });
+			return;
+		}
+	}
+
+	copyTextWithTextArea({ text });
+}
+
+/**
+ * Copies text with a temporary textarea fallback.
+ *
+ * @param {object} params Parameters.
+ * @param {string} params.text Text to copy.
+ * @returns {void}
+ */
+function copyTextWithTextArea({ text }) {
+	const textArea = document.createElement("textarea");
+	textArea.value = text;
+	textArea.setAttribute("readonly", "");
+	textArea.className = "clipboard-fallback";
+	document.body.appendChild(textArea);
+	textArea.select();
+	document.execCommand("copy");
+	textArea.remove();
+}
+
+/**
  * Applies the initial theme.
  *
  * @param {object} params Parameters.
@@ -398,6 +628,10 @@ function getDefaultTheme({ config }) {
 function applyTheme({ theme }) {
 	document.documentElement.dataset.theme = theme;
 	updateThemeToggle({ theme });
+
+	if (state.activeData) {
+		renderActiveGraph();
+	}
 }
 
 /**
@@ -437,6 +671,70 @@ function getCurrentTheme() {
  */
 function isTheme(value) {
 	return value === "light" || value === "dark";
+}
+
+/**
+ * Applies the initial content width preference.
+ *
+ * @returns {void}
+ */
+function applyInitialContentWidth() {
+	const savedContentWidth = localStorage.getItem(contentWidthStorageKey);
+	const contentWidth = isContentWidth(savedContentWidth) ? savedContentWidth : "full";
+
+	applyContentWidth({ contentWidth });
+}
+
+/**
+ * Applies a content width mode.
+ *
+ * @param {object} params Parameters.
+ * @param {string} params.contentWidth Content width mode.
+ * @returns {void}
+ */
+function applyContentWidth({ contentWidth }) {
+	document.body.classList.toggle("content-is-centered", contentWidth === "centered");
+	updateContentWidthToggle({ contentWidth });
+}
+
+/**
+ * Updates the content width toggle button.
+ *
+ * @param {object} params Parameters.
+ * @param {string} params.contentWidth Content width mode.
+ * @returns {void}
+ */
+function updateContentWidthToggle({ contentWidth }) {
+	const icon = elements.contentWidthToggleButton.querySelector("i");
+	const isCentered = contentWidth === "centered";
+	const label = isCentered ? "Use full-width content" : "Use centered content";
+
+	elements.contentWidthToggleButton.setAttribute("aria-pressed", String(isCentered));
+	elements.contentWidthToggleButton.setAttribute("aria-label", label);
+	elements.contentWidthToggleButton.setAttribute("title", label);
+
+	if (icon) {
+		icon.className = isCentered ? "fa-solid fa-up-right-and-down-left-from-center" : "fa-solid fa-down-left-and-up-right-to-center";
+	}
+}
+
+/**
+ * Gets the current content width mode.
+ *
+ * @returns {string} Current content width mode.
+ */
+function getCurrentContentWidth() {
+	return document.body.classList.contains("content-is-centered") ? "centered" : "full";
+}
+
+/**
+ * Checks a content width value.
+ *
+ * @param {unknown} value Content width value.
+ * @returns {boolean} Whether the value is a supported content width.
+ */
+function isContentWidth(value) {
+	return value === "full" || value === "centered";
 }
 
 /**

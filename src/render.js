@@ -132,6 +132,48 @@ export function renderTable({ table, rows }) {
 }
 
 /**
+ * Renders a periodic table for the elements dataset.
+ *
+ * @param {object} params Parameters.
+ * @param {HTMLElement} params.container Periodic table container.
+ * @param {Array<object>} params.rows Element rows.
+ * @returns {void}
+ */
+export function renderPeriodicTable({ container, rows }) {
+	const elementsByAtomicNumber = getElementsByAtomicNumber({ rows });
+
+	clearElement(container);
+
+	if (elementsByAtomicNumber.size === 0) {
+		container.appendChild(createElement({
+			tag: "p",
+			attributes: { class: "empty-state periodic-table__empty" },
+			text: "No matching elements."
+		}));
+		return;
+	}
+
+	for (let period = 1; period <= 9; period += 1) {
+		for (let group = 1; group <= 18; group += 1) {
+			const atomicNumber = getAtomicNumberAtPosition({ period, group });
+			const element = elementsByAtomicNumber.get(atomicNumber);
+
+			if (element) {
+				container.appendChild(createPeriodicTableElement({ element }));
+			} else {
+				container.appendChild(createElement({
+					tag: "div",
+					attributes: {
+						class: "periodic-table__gap",
+						"aria-hidden": "true"
+					}
+				}));
+			}
+		}
+	}
+}
+
+/**
  * Creates a dataset selection button.
  *
  * @param {object} params Parameters.
@@ -154,7 +196,7 @@ function createDatasetButton({ dataset, className, role = "", isExpanded = false
 	});
 	const heading = createElement({ tag: "div", attributes: { class: "suggestion-button__heading" } });
 	const title = createElement({ tag: "strong", text: dataset.name });
-	const description = createElement({ tag: "span", text: dataset.description });
+	const description = createElement({ tag: "span", text: getDatasetDescription({ dataset }) });
 
 	heading.appendChild(title);
 
@@ -166,6 +208,45 @@ function createDatasetButton({ dataset, className, role = "", isExpanded = false
 
 	button.append(heading, description);
 	return button;
+}
+
+/**
+ * Gets a sidebar dataset description with size context.
+ *
+ * @param {object} params Parameters.
+ * @param {object} params.dataset Dataset summary.
+ * @returns {string} Dataset description.
+ */
+function getDatasetDescription({ dataset }) {
+	const datasetSize = getDatasetSize({ dataset });
+	const description = dataset.description ?? "";
+
+	if (!datasetSize) {
+		return description;
+	}
+
+	return `N=${datasetSize} | ${description}`;
+}
+
+/**
+ * Gets the dataset size from the generated index.
+ *
+ * @param {object} params Parameters.
+ * @param {object} params.dataset Dataset summary.
+ * @returns {string} Dataset size.
+ */
+function getDatasetSize({ dataset }) {
+	const size = dataset.size;
+
+	if (typeof size === "number" && Number.isFinite(size)) {
+		return String(size);
+	}
+
+	if (typeof size === "string" && size.trim()) {
+		return size.trim();
+	}
+
+	return "";
 }
 
 /**
@@ -227,6 +308,153 @@ function formatCellValue(value) {
 	}
 
 	return String(value);
+}
+
+/**
+ * Gets element rows by atomic number.
+ *
+ * @param {object} params Parameters.
+ * @param {Array<object>} params.rows Element rows.
+ * @returns {Map<number, object>} Elements keyed by atomic number.
+ */
+function getElementsByAtomicNumber({ rows }) {
+	const elementsByAtomicNumber = new Map();
+
+	for (let index = 0; index < rows.length; index += 1) {
+		const atomicNumber = Number(rows[index].z);
+
+		if (Number.isInteger(atomicNumber) && atomicNumber >= 1 && atomicNumber <= 118) {
+			elementsByAtomicNumber.set(atomicNumber, rows[index]);
+		}
+	}
+
+	return elementsByAtomicNumber;
+}
+
+/**
+ * Creates one periodic table element cell.
+ *
+ * @param {object} params Parameters.
+ * @param {object} params.element Element row.
+ * @returns {HTMLElement} Element cell.
+ */
+function createPeriodicTableElement({ element }) {
+	const atomicNumber = formatCellValue(element.z);
+	const symbol = formatCellValue(element.symbol);
+	const name = formatCellValue(element.name);
+	const cell = createElement({
+		tag: "article",
+		attributes: {
+			class: "periodic-table__element",
+			role: "listitem",
+			title: `${atomicNumber} ${symbol} ${name}`.trim()
+		}
+	});
+	const atomicNumberElement = createElement({
+		tag: "span",
+		attributes: { class: "periodic-table__atomic-number" },
+		text: atomicNumber
+	});
+	const symbolElement = createElement({
+		tag: "strong",
+		attributes: { class: "periodic-table__symbol" },
+		text: symbol
+	});
+
+	cell.append(atomicNumberElement, symbolElement);
+	return cell;
+}
+
+/**
+ * Gets the element atomic number at a periodic table position.
+ *
+ * @param {object} params Parameters.
+ * @param {number} params.period Display row.
+ * @param {number} params.group Display column.
+ * @returns {number} Atomic number or 0.
+ */
+function getAtomicNumberAtPosition({ period, group }) {
+	if (period === 1) {
+		return group === 1 ? 1 : group === 18 ? 2 : 0;
+	}
+
+	if (period === 2) {
+		return getAtomicNumberFromRanges({
+			group,
+			ranges: [
+				{ startGroup: 1, startAtomicNumber: 3, endGroup: 2 },
+				{ startGroup: 13, startAtomicNumber: 5, endGroup: 18 }
+			]
+		});
+	}
+
+	if (period === 3) {
+		return getAtomicNumberFromRanges({
+			group,
+			ranges: [
+				{ startGroup: 1, startAtomicNumber: 11, endGroup: 2 },
+				{ startGroup: 13, startAtomicNumber: 13, endGroup: 18 }
+			]
+		});
+	}
+
+	if (period === 4) {
+		return group + 18;
+	}
+
+	if (period === 5) {
+		return group + 36;
+	}
+
+	if (period === 6) {
+		return getAtomicNumberFromRanges({
+			group,
+			ranges: [
+				{ startGroup: 1, startAtomicNumber: 55, endGroup: 2 },
+				{ startGroup: 4, startAtomicNumber: 72, endGroup: 18 }
+			]
+		});
+	}
+
+	if (period === 7) {
+		return getAtomicNumberFromRanges({
+			group,
+			ranges: [
+				{ startGroup: 1, startAtomicNumber: 87, endGroup: 2 },
+				{ startGroup: 4, startAtomicNumber: 104, endGroup: 18 }
+			]
+		});
+	}
+
+	if (period === 8 && group >= 3 && group <= 17) {
+		return group + 54;
+	}
+
+	if (period === 9 && group >= 3 && group <= 17) {
+		return group + 86;
+	}
+
+	return 0;
+}
+
+/**
+ * Gets an atomic number from row ranges.
+ *
+ * @param {object} params Parameters.
+ * @param {number} params.group Display column.
+ * @param {Array<object>} params.ranges Period ranges.
+ * @returns {number} Atomic number or 0.
+ */
+function getAtomicNumberFromRanges({ group, ranges }) {
+	for (let index = 0; index < ranges.length; index += 1) {
+		const range = ranges[index];
+
+		if (group >= range.startGroup && group <= range.endGroup) {
+			return range.startAtomicNumber + group - range.startGroup;
+		}
+	}
+
+	return 0;
 }
 
 /**

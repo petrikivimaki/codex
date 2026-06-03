@@ -1,7 +1,8 @@
 {
   "title": "Codex | Open Data for All",
-  "brandTitle": "Codex",
+  "brandTitle": "Codex by Petri Kivimäki",
   "brandSubtitle": "Open Data for All",
+  "siteUrl": "https://petrikivimaki.github.io/codex/",
   "defaultDatasetId": "swiss-cantons",
   "dataMode": "remote",
   "indexPath": "index.json",

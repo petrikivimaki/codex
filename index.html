@@ -3,7 +3,32 @@
     <head>
         <meta charset="utf-8" />
         <meta name="viewport" content="width=device-width, initial-scale=1" />
-        <title>Codex Data Explorer</title>
+        <title>Codex | Open Data for All</title>
+        <meta
+            name="description"
+            content="Codex is a client-side explorer for browsing, mapping and downloading public domain JSON datasets."
+        />
+        <meta name="author" content="Petri Kivimaki" />
+        <meta name="application-name" content="Codex" />
+        <meta name="color-scheme" content="light dark" />
+        <link rel="canonical" href="https://petrikivimaki.github.io/codex/" />
+        <meta property="og:type" content="website" />
+        <meta property="og:site_name" content="Codex" />
+        <meta property="og:title" content="Codex | Open Data for All" />
+        <meta
+            property="og:description"
+            content="Explore and download public domain JSON datasets."
+        />
+        <meta
+            property="og:url"
+            content="https://petrikivimaki.github.io/codex/"
+        />
+        <meta name="twitter:card" content="summary" />
+        <meta name="twitter:title" content="Codex | Open Data for All" />
+        <meta
+            name="twitter:description"
+            content="Explore and download public domain JSON datasets."
+        />
         <link
             rel="stylesheet"
             href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css"
@@ -12,8 +37,9 @@
             rel="stylesheet"
             href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
         />
-        <link rel="stylesheet" href="styles/main.css" />
+        <link rel="stylesheet" href="styles/main.css?v=18" />
         <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
+        <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
         <script type="module" src="src/app.js"></script>
     </head>
     <body>
@@ -43,8 +69,14 @@
                                 name="dataset-search"
                                 type="search"
                                 autocomplete="off"
-                                placeholder="Search datasets, topics, formats, places"
+                                placeholder="Search datasets..."
                             />
+                            <span
+                                class="search-count"
+                                id="dataset-search-count"
+                                aria-live="polite"
+                                >0</span
+                            >
                         </form>
                         <div
                             class="suggestions"
@@ -77,6 +109,19 @@
                         title="Switch to dark theme"
                     >
                         <i class="fa-solid fa-moon" aria-hidden="true"></i>
+                    </button>
+                    <button
+                        class="rail-button"
+                        id="content-width-toggle-button"
+                        type="button"
+                        aria-pressed="false"
+                        aria-label="Use centered content"
+                        title="Use centered content"
+                    >
+                        <i
+                            class="fa-solid fa-down-left-and-up-right-to-center"
+                            aria-hidden="true"
+                        ></i>
                     </button>
                     <a
                         class="rail-button"
@@ -113,30 +158,44 @@
                                     aria-hidden="true"
                                 ></i>
                             </button>
+                            <button
+                                class="secondary-button icon-action-button"
+                                id="copy-dataset-link-button"
+                                type="button"
+                                aria-label="Copy dataset link"
+                                title="Copy dataset link"
+                            >
+                                <i
+                                    class="fa-solid fa-link"
+                                    aria-hidden="true"
+                                ></i>
+                            </button>
                             <a
-                                class="secondary-button"
+                                class="secondary-button icon-action-button"
                                 id="source-json-link"
                                 href="#"
                                 target="_blank"
                                 rel="noopener"
+                                aria-label="View source JSON"
+                                title="View source JSON"
                             >
                                 <i
                                     class="fa-brands fa-github"
                                     aria-hidden="true"
                                 ></i>
-                                <span>Source</span>
                             </a>
                             <a
-                                class="primary-button"
+                                class="primary-button icon-action-button"
                                 id="download-json-link"
                                 href="#"
+                                aria-label="Download JSON"
+                                title="Download JSON"
                                 download
                             >
                                 <i
                                     class="fa-solid fa-file-arrow-down"
                                     aria-hidden="true"
                                 ></i>
-                                <span>JSON</span>
                             </a>
                         </div>
                     </div>
@@ -198,6 +257,33 @@
 
                 <section
                     class="dataset-card detail-section"
+                    id="graph-section"
+                    aria-label="Dataset graph"
+                >
+                    <div class="graph-controls" id="graph-controls"></div>
+                    <div class="graph-canvas-wrap">
+                        <canvas id="graph-canvas"></canvas>
+                    </div>
+                    <p class="empty-state" id="graph-empty-state" hidden>
+                        This dataset does not include enough numeric fields to draw a graph.
+                    </p>
+                </section>
+
+                <section
+                    class="dataset-card detail-section"
+                    id="periodic-table-section"
+                    aria-label="Periodic table of elements"
+                    hidden
+                >
+                    <div
+                        class="periodic-table"
+                        id="periodic-table"
+                        role="list"
+                    ></div>
+                </section>
+
+                <section
+                    class="dataset-card detail-section"
                     id="map-section"
                     aria-label="Map"
                     hidden
@@ -207,6 +293,15 @@
                         This dataset does not include coordinate fields.
                     </p>
                 </section>
+                <button
+                    class="scroll-top-button"
+                    id="scroll-top-button"
+                    type="button"
+                    aria-label="Scroll to top"
+                    title="Scroll to top"
+                >
+                    <i class="fa-solid fa-arrow-up" aria-hidden="true"></i>
+                </button>
             </main>
         </div>
     </body>

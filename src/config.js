@@ -5,7 +5,7 @@
  * @returns {Promise<object>} Application configuration.
  */
 export async function loadConfig() {
-	const response = await fetch("config/app-config.json?v=6");
+	const response = await fetch("config/app-config.json?v=7");
 
 	if (!response.ok) {
 		throw new Error("Could not load app configuration.");
@@ -36,6 +36,21 @@ export function getRepositoryUrl({ config }) {
 	const remote = config.remote;
 
 	return `https://github.com/${remote.owner}/${remote.repo}`;
+}
+
+/**
+ * Gets the GitHub data directory URL.
+ *
+ * @param {object} params Parameters.
+ * @param {object} params.config Application configuration.
+ * @returns {string} GitHub data directory URL.
+ */
+export function getRepositoryDataUrl({ config }) {
+	const remote = config.remote;
+	const dataPath = String(config.dataPath ?? "").replace(/^\/+|\/+$/g, "");
+	const dataPathSegment = dataPath ? `/${dataPath}` : "";
+
+	return `${getRepositoryUrl({ config })}/tree/${remote.branch}${dataPathSegment}`;
 }
 
 /**

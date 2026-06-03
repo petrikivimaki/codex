@@ -53,8 +53,24 @@ export function renderMap({ container, emptyState, rows }) {
 		zoom: 3
 	});
 
+	addFullscreenControl({ map: activeMap });
 	activeMap.addControl(new window.maplibregl.NavigationControl({ showCompass: false }), "top-right");
 	activeMap.on("load", handleMapLoad);
+}
+
+/**
+ * Adds the native fullscreen control when supported by MapLibre.
+ *
+ * @param {object} params Parameters.
+ * @param {object} params.map MapLibre map instance.
+ * @returns {void}
+ */
+function addFullscreenControl({ map }) {
+	if (!window.maplibregl.FullscreenControl) {
+		return;
+	}
+
+	map.addControl(new window.maplibregl.FullscreenControl(), "top-left");
 }
 
 /**
