@@ -804,7 +804,7 @@ h2 {
 	}
 
 	.sidebar-is-collapsed .app-layout {
-		grid-template-columns: 56px minmax(0, 1fr);
+		grid-template-columns: minmax(0, 1fr);
 	}
 
 	.sidebar__brand {
@@ -813,6 +813,11 @@ h2 {
 
 	.content {
 		padding: 12px;
+	}
+
+	.sidebar-is-collapsed .content {
+		width: calc(100vw - 56px);
+		margin-left: 56px;
 	}
 
 	h2 {
