@@ -1,5 +1,7 @@
+import { createSortHeader } from "./table-sort-header.js";
 import { clearElement, createElement } from "./dom.js";
-import { hasCoordinateRows } from "./map-view.js";
+import { createTableCell } from "./table-cell-details.js";
+import { getShortDescription } from "./dataset-descriptions.js";
 
 /**
  * Renders dataset suggestions.
@@ -42,93 +44,119 @@ export function renderSuggestions({ container, datasets, activeDatasetId = "", e
 }
 
 /**
- * Renders metadata details.
- *
- * @param {object} params Parameters.
- * @param {HTMLElement} params.container Metadata container.
- * @param {object} params.dataset Dataset summary.
- * @param {object} params.data Full dataset.
- * @returns {void}
- */
-export function renderMetadata({ container, dataset, data }) {
-	const properties = data.properties;
-	const rows = data.data;
-	const metadataItems = [
-		["Description", properties.description ?? dataset.description],
-		["Category", properties.category ?? dataset.category],
-		["Tags", (properties.tags ?? dataset.tags ?? []).join(", ")],
-		["Format", properties.format?.toUpperCase() ?? dataset.format?.toUpperCase() ?? "JSON"],
-		["Source", properties.source ?? dataset.source ?? "Remote"],
-		["License", properties.license ?? dataset.license ?? "Unknown"],
-		["Map support", hasCoordinateRows({ rows }) ? "Coordinates available" : "No coordinates"],
-		["Rows", String(rows.length)]
-	];
-
-	clearElement(container);
-
-	for (let index = 0; index < metadataItems.length; index += 1) {
-		const [label, value] = metadataItems[index];
-		const item = createElement({
-			tag: "div",
-			attributes: { class: label === "Description" ? "metadata-item metadata-item--wide" : "metadata-item" }
-		});
-		const labelElement = createElement({ tag: "strong", text: label });
-		const valueElement = createElement({ tag: "span", text: value });
-
-		item.append(labelElement, valueElement);
-		container.appendChild(item);
-	}
-}
-
-/**
  * Renders a data table.
  *
  * @param {object} params Parameters.
  * @param {HTMLTableElement} params.table Table element.
  * @param {Array<object>} params.rows Dataset rows.
+ * @param {Array<string>} params.columns Visible field keys in dataset order.
+ * @param {{field: string, direction: "ascending"|"descending"}|null} [params.sort] Active column sort.
+ * @param {number} [params.previewLength] Maximum inline value length.
+ * @param {"blank"|"icon"} [params.emptyValueDisplay] Empty-value presentation.
+ * @param {"text"|"icon"} [params.booleanValueDisplay] Boolean presentation.
  * @returns {void}
  */
-export function renderTable({ table, rows }) {
+export function renderTable({ table, rows, columns, sort = null, previewLength = 120, emptyValueDisplay = "icon", booleanValueDisplay = "icon" }) {
 	clearElement(table);
+	const cellPreviewLength = Number.isInteger(previewLength) && previewLength > 0 ? previewLength : 120;
+	const thead = createElement({ tag: "thead" });
+	const headerRow = createElement({ tag: "tr" });
+	const tbody = createElement({ tag: "tbody" });
+
+	for (const column of columns) {
+		headerRow.appendChild(createSortHeader({ field: column, label: toTitleCase(column), sort }));
+	}
+
+	thead.appendChild(headerRow);
+	table.append(thead, tbody);
 
 	if (rows.length === 0) {
-		const tbody = createElement({ tag: "tbody" });
 		const row = createElement({ tag: "tr" });
 		const cell = createElement({
 			tag: "td",
-			attributes: { colspan: "1" },
+			attributes: { colspan: String(Math.max(columns.length, 1)) },
 			text: "No matching rows."
 		});
 
 		row.appendChild(cell);
 		tbody.appendChild(row);
-		table.appendChild(tbody);
 		return;
 	}
 
-	const columns = Object.keys(rows[0]);
-	const thead = createElement({ tag: "thead" });
-	const headerRow = createElement({ tag: "tr" });
-	const tbody = createElement({ tag: "tbody" });
-
-	for (let columnIndex = 0; columnIndex < columns.length; columnIndex += 1) {
-		headerRow.appendChild(createElement({ tag: "th", text: toTitleCase(columns[columnIndex]) }));
-	}
-
-	thead.appendChild(headerRow);
-
 	for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
 		const row = createElement({ tag: "tr" });
+		const detailRow = createElement({
+			tag: "tr",
+			attributes: { id: `${table.id}-detail-${rowIndex}`, class: "table-detail-row", hidden: "" }
+		});
+		detailRow.append(createElement({ tag: "td", attributes: { colspan: String(columns.length) } }));
 
 		for (let columnIndex = 0; columnIndex < columns.length; columnIndex += 1) {
 			const value = rows[rowIndex][columns[columnIndex]];
-			row.appendChild(createElement({ tag: "td", text: formatCellValue(value) }));
+			row.appendChild(createTableCell({
+				value,
+				text: Array.isArray(value) ? "" : formatCellValue(value),
+				label: toTitleCase(columns[columnIndex]),
+				rowNumber: rowIndex + 1,
+				recordRow: row,
+				detailRow,
+				previewLength: cellPreviewLength,
+				emptyValueDisplay,
+				booleanValueDisplay
+			}));
 		}
 
 		tbody.appendChild(row);
+
+		if (row.querySelector(".table-cell-toggle")) {
+			tbody.appendChild(detailRow);
+		}
+	}
+}
+
+/**
+ * Creates accessible field switches when a dataset is selected.
+ *
+ * @param {object} params Parameters.
+ * @param {HTMLElement} params.container Switch container.
+ * @param {Array<string>} params.fields Available field keys.
+ * @returns {void}
+ */
+export function renderTableFields({ container, fields }) {
+	const fragment = document.createDocumentFragment();
+
+	for (const field of fields) {
+		const label = createElement({ tag: "label", attributes: { class: "table-field-option" } });
+		const input = createElement({
+			tag: "input",
+			attributes: { type: "checkbox", role: "switch", name: "table-field", value: field }
+		});
+		label.append(input, createElement({ tag: "span", text: toTitleCase(field) }));
+		fragment.append(label);
 	}
 
-	table.append(thead, tbody);
+	container.replaceChildren(fragment);
+}
+
+/**
+ * Updates field selections in place, keeping keyboard focus on the input.
+ *
+ * @param {object} params Parameters.
+ * @param {HTMLElement} params.container Switch container.
+ * @param {Set<string>} params.visibleFields Selected field keys.
+ * @returns {void}
+ */
+export function updateTableFields({ container, visibleFields }) {
+	const inputs = container.querySelectorAll('input[name="table-field"]');
+
+	for (const input of inputs) {
+		if (!(input instanceof HTMLInputElement)) {
+			continue;
+		}
+
+		input.checked = visibleFields.has(input.value);
+		input.disabled = input.checked && visibleFields.size === 1;
+	}
 }
 
 /**
@@ -219,13 +247,13 @@ function createDatasetButton({ dataset, className, role = "", isExpanded = false
  */
 function getDatasetDescription({ dataset }) {
 	const datasetSize = getDatasetSize({ dataset });
-	const description = dataset.description ?? "";
+	const description = getShortDescription({ dataset });
 
 	if (!datasetSize) {
 		return description;
 	}
 
-	return `N=${datasetSize} | ${description}`;
+	return description ? `N=${datasetSize} | ${description}` : `N=${datasetSize}`;
 }
 
 /**

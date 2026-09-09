@@ -1,0 +1,13 @@
+{
+	"name": "codex",
+	"description": "open data directory and exploration tool for common infrequently updated datasets",
+	"author": {
+    "name": "Petri Mikael Kivimäki",
+    "url": "https://pmk.dev"
+  },
+	"license": "MIT",
+	"type": "module",
+	"scripts": {
+		"dev": "python3 -m http.server 4242"
+	}
+}

@@ -37,7 +37,7 @@
             rel="stylesheet"
             href="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.css"
         />
-        <link rel="stylesheet" href="styles/main.css?v=18" />
+        <link rel="stylesheet" href="styles/main.css" />
         <script src="https://unpkg.com/maplibre-gl@4.7.1/dist/maplibre-gl.js"></script>
         <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.9/dist/chart.umd.min.js"></script>
         <script type="module" src="src/app.js"></script>
@@ -138,7 +138,7 @@
             <main class="content" aria-live="polite">
                 <section class="dataset-card title-card">
                     <div class="dataset-toolbar">
-                        <div>
+                        <div class="dataset-toolbar__heading">
                             <p class="eyebrow" id="active-dataset-category">
                                 Loading
                             </p>
@@ -197,9 +197,21 @@
                                     aria-hidden="true"
                                 ></i>
                             </a>
+                            <button
+                                class="secondary-button icon-action-button metadata-toggle"
+                                id="metadata-toggle-button"
+                                type="button"
+                                aria-expanded="false"
+                                aria-controls="dataset-details dataset-extra-labels"
+                                aria-label="Expand dataset details"
+                                title="Expand dataset details"
+                            >
+                                <i class="fa-solid fa-chevron-down" aria-hidden="true"></i>
+                            </button>
                         </div>
                     </div>
 
+                    <div class="dataset-details" id="dataset-details" role="region" aria-label="Dataset details" hidden></div>
                     <div class="status-bar">
                         <div class="status-pill">
                             <i
@@ -222,15 +234,8 @@
                             ></i>
                             <span id="dataset-source">Local</span>
                         </div>
+                        <div class="dataset-extra-labels" id="dataset-extra-labels" hidden></div>
                     </div>
-                </section>
-
-                <section
-                    class="dataset-card detail-section"
-                    id="metadata-panel"
-                    aria-label="Metadata"
-                >
-                    <div class="metadata-grid" id="metadata-grid"></div>
                 </section>
 
                 <section
@@ -249,6 +254,31 @@
                             placeholder="Filter rows"
                         />
                         <span id="row-filter-count">0 matching rows</span>
+                    </div>
+					<details class="table-field-picker" id="table-field-picker" hidden>
+						<summary>
+							<i class="fa-solid fa-table-columns" aria-hidden="true"></i>
+							<span>Fields</span>
+							<span class="table-field-count" id="table-field-count">0 shown</span>
+							<i class="fa-solid fa-chevron-down table-field-chevron" aria-hidden="true"></i>
+						</summary>
+						<div class="table-field-panel">
+							<div class="table-field-toolbar">
+								<span>Choose fields to show in the table.</span>
+								<button class="secondary-button" id="show-all-fields-button" type="button">Show all</button>
+							</div>
+							<fieldset class="table-field-set">
+								<legend class="visually-hidden">Visible table fields; keep at least one selected</legend>
+								<div class="table-field-options" id="table-field-options"></div>
+							</fieldset>
+						</div>
+					</details>
+                    <div class="table-sort-toolbar">
+                        <span id="table-sort-status" role="status">Source order</span>
+                        <button class="table-sort-reset" id="reset-table-sort-button" type="button" disabled>
+                            <i class="fa-solid fa-arrow-rotate-left" aria-hidden="true"></i>
+                            Restore source order
+                        </button>
                     </div>
                     <div class="data-table-wrap">
                         <table class="data-table" id="data-table"></table>

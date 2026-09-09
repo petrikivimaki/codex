@@ -1,4 +1,4 @@
-import { getDatasetCdnUrl, getDatasetIndexUrl } from "./config.js?v=6";
+import { getDatasetCdnUrl, getDatasetIndexUrl } from "./config.js";
 
 /**
  * Loads the dataset index from local or remote configuration.
@@ -92,6 +92,8 @@ export function filterDatasets({ datasets, query }) {
 		const searchableText = [
 			dataset.name,
 			dataset.description,
+			dataset.shortDescription,
+			dataset.longDescription,
 			dataset.category,
 			dataset.polity,
 			...(dataset.tags ?? [])
@@ -133,6 +135,25 @@ export function filterRows({ rows, query }) {
 	}
 
 	return filteredRows;
+}
+
+/**
+ * Collects fields across the complete dataset in first-seen order.
+ *
+ * @param {object} params Parameters.
+ * @param {Array<Record<string, unknown>>} params.rows Dataset rows.
+ * @returns {Array<string>} Available field keys.
+ */
+export function getRowFields({ rows }) {
+	const fields = new Set();
+
+	for (const row of rows) {
+		for (const field of Object.keys(row)) {
+			fields.add(field);
+		}
+	}
+
+	return Array.from(fields);
 }
 
 /**

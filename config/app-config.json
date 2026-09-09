@@ -8,6 +8,9 @@
   "indexPath": "index.json",
   "dataPath": "data",
   "defaultTheme": "light",
+  "tableCellPreviewLength": 120,
+  "tableEmptyValueDisplay": "icon",
+  "tableBooleanValueDisplay": "icon",
   "remote": {
     "owner": "petrikivimaki",
     "repo": "codex-data",

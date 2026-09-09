@@ -5,7 +5,7 @@
  * @returns {Promise<object>} Application configuration.
  */
 export async function loadConfig() {
-	const response = await fetch("config/app-config.json?v=7");
+	const response = await fetch("config/app-config.json");
 
 	if (!response.ok) {
 		throw new Error("Could not load app configuration.");
@@ -82,14 +82,18 @@ export function getRemoteCdnBaseUrl({ config }) {
 }
 
 /**
- * Gets the GitHub source URL for a dataset file.
+ * Gets the local file or GitHub source URL for a dataset.
  *
  * @param {object} params Parameters.
  * @param {object} params.config Application configuration.
  * @param {object} params.dataset Dataset summary.
- * @returns {string} GitHub source URL.
+ * @returns {string} Dataset source URL.
  */
 export function getDatasetSourceUrl({ config, dataset }) {
+	if (config.dataMode === "local") {
+		return getDatasetCdnUrl({ config, dataset });
+	}
+
 	const remote = config.remote;
 	const path = getRepositoryDatasetPath({ config, dataset });
 

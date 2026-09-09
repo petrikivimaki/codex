@@ -1,9 +1,11 @@
-import { getDatasetCdnUrl, getDatasetSourceUrl, getRepositoryDataUrl, loadConfig } from "./config.js?v=8";
-import { getDefaultChartFields, renderChart } from "./chart-view.js?v=2";
-import { filterDatasets, filterRows, findDatasetById, loadDataset, loadDatasetIndex } from "./data-service.js?v=6";
+import { sortTableRows } from "./table-sort.js";
+import { renderDatasetOverview } from "./dataset-overview.js";
+import { getDatasetCdnUrl, getDatasetSourceUrl, getRepositoryDataUrl, loadConfig } from "./config.js";
+import { getDefaultChartFields, renderChart } from "./chart-view.js";
+import { filterDatasets, filterRows, findDatasetById, getRowFields, loadDataset, loadDatasetIndex } from "./data-service.js";
 import { selectElement } from "./dom.js";
 import { hasCoordinateRows, renderMap } from "./map-view.js";
-import { renderMetadata, renderPeriodicTable, renderSuggestions, renderTable } from "./render.js?v=8";
+import { renderPeriodicTable, renderSuggestions, renderTable, renderTableFields, updateTableFields } from "./render.js";
 
 const bookmarksStorageKey = "codex.bookmarkedDatasetIds";
 const contentWidthStorageKey = "codex.contentWidth";
@@ -17,6 +19,10 @@ const state = {
 	expandedDatasetId: "",
 	bookmarkedDatasetIds: new Set(),
 	filteredRows: [],
+	tableFields: [],
+	visibleTableFields: new Set(),
+	tableSelections: new Map(),
+	tableSort: null,
 	chartFields: {
 		xField: "",
 		yField: "",
@@ -43,10 +49,18 @@ const elements = {
 	downloadJsonLink: selectElement("#download-json-link"),
 	bookmarkButton: selectElement("#bookmark-button"),
 	copyDatasetLinkButton: selectElement("#copy-dataset-link-button"),
-	metadataGrid: selectElement("#metadata-grid"),
+	metadataToggleButton: selectElement("#metadata-toggle-button"),
+	datasetDetails: selectElement("#dataset-details"),
+	datasetExtraLabels: selectElement("#dataset-extra-labels"),
 	rowFilter: selectElement("#row-filter"),
 	rowFilterCount: selectElement("#row-filter-count"),
 	dataTable: selectElement("#data-table"),
+	tableSortStatus: selectElement("#table-sort-status"),
+	resetTableSortButton: selectElement("#reset-table-sort-button"),
+	tableFieldPicker: selectElement("#table-field-picker"),
+	tableFieldOptions: selectElement("#table-field-options"),
+	tableFieldCount: selectElement("#table-field-count"),
+	showAllFieldsButton: selectElement("#show-all-fields-button"),
 	graphControls: selectElement("#graph-controls"),
 	graphCanvas: selectElement("#graph-canvas"),
 	graphEmptyState: selectElement("#graph-empty-state"),
@@ -127,11 +141,31 @@ function bindEvents() {
 	elements.toggleSidebarButton.addEventListener("click", handleToggleSidebarClick);
 	elements.themeToggleButton.addEventListener("click", handleThemeToggleClick);
 	elements.contentWidthToggleButton.addEventListener("click", handleContentWidthToggleClick);
+	elements.dataTable.addEventListener("click", handleTableSortClick);
+	elements.resetTableSortButton.addEventListener("click", handleResetTableSortClick);
 	elements.rowFilter.addEventListener("input", handleRowFilterInput);
+	elements.tableFieldOptions.addEventListener("change", handleTableFieldChange);
+	elements.showAllFieldsButton.addEventListener("click", handleShowAllFieldsClick);
 	elements.graphControls.addEventListener("change", handleGraphControlsChange);
 	elements.bookmarkButton.addEventListener("click", handleBookmarkClick);
 	elements.copyDatasetLinkButton.addEventListener("click", handleCopyDatasetLinkClick);
+	elements.metadataToggleButton.addEventListener("click", handleMetadataToggleClick);
 	elements.scrollTopButton.addEventListener("click", handleScrollTopClick);
+}
+
+/**
+ * Toggles the overview body and extra footer labels without rerendering data.
+ *
+ * @returns {void}
+ */
+function handleMetadataToggleClick() {
+	const expanded = elements.metadataToggleButton.getAttribute("aria-expanded") !== "true";
+	const label = expanded ? "Collapse dataset details" : "Expand dataset details";
+	elements.metadataToggleButton.setAttribute("aria-expanded", String(expanded));
+	elements.metadataToggleButton.setAttribute("aria-label", label);
+	elements.metadataToggleButton.title = label;
+	elements.datasetDetails.hidden = !expanded;
+	elements.datasetExtraLabels.hidden = !expanded;
 }
 
 /**
@@ -184,6 +218,148 @@ function handleContentWidthToggleClick() {
  */
 function handleRowFilterInput() {
 	renderFilteredRows();
+}
+
+/**
+ * Cycles one column through ascending, descending, and source order.
+ *
+ * @param {MouseEvent} event Header click event.
+ * @returns {void}
+ */
+function handleTableSortClick(event) {
+	const button = event.target instanceof Element ? event.target.closest("button[data-sort-field]") : null;
+	const field = button?.dataset.sortField;
+	if (!field || !state.visibleTableFields.has(field)) {
+		return;
+	}
+	const current = state.tableSort?.field === field ? state.tableSort.direction : null;
+	state.tableSort = current === "descending" ? null : { field, direction: current === "ascending" ? "descending" : "ascending" };
+	renderActiveTable();
+	for (const headerButton of elements.dataTable.querySelectorAll("button[data-sort-field]")) {
+		if (headerButton.dataset.sortField === field) {
+			headerButton.focus({ preventScroll: true });
+			break;
+		}
+	}
+}
+
+/**
+ * Restores dataset order while retaining the current filter and selected fields.
+ *
+ * @returns {void}
+ */
+function handleResetTableSortClick() {
+	state.tableSort = null;
+	renderActiveTable();
+	elements.dataTable.querySelector("button[data-sort-field]")?.focus({ preventScroll: true });
+}
+
+/**
+ * Changes table visibility without rerendering graphs or maps.
+ *
+ * @param {Event} event Checkbox change event.
+ * @returns {void}
+ */
+function handleTableFieldChange(event) {
+	const input = event.target;
+
+	if (!(input instanceof HTMLInputElement) || !state.tableFields.includes(input.value)) {
+		return;
+	}
+
+	if (input.checked) {
+		state.visibleTableFields.add(input.value);
+	} else if (state.visibleTableFields.size > 1) {
+		state.visibleTableFields.delete(input.value);
+	}
+
+	updateTableFieldSelection();
+}
+
+/**
+ * Restores all available fields in their original order.
+ *
+ * @returns {void}
+ */
+function handleShowAllFieldsClick() {
+	state.visibleTableFields = new Set(state.tableFields);
+	updateTableFieldSelection();
+}
+
+/**
+ * Remembers this dataset's selection for the current page session.
+ *
+ * @returns {void}
+ */
+function updateTableFieldSelection() {
+	if (!state.activeDataset) {
+		return;
+	}
+
+	if (state.tableSort && !state.visibleTableFields.has(state.tableSort.field)) {
+		state.tableSort = null;
+	}
+	state.tableSelections.set(state.activeDataset.id, state.visibleTableFields);
+	updateTableFields({ container: elements.tableFieldOptions, visibleFields: state.visibleTableFields });
+	elements.tableFieldCount.textContent = `${state.visibleTableFields.size} of ${state.tableFields.length} shown`;
+	elements.showAllFieldsButton.disabled = state.visibleTableFields.size === state.tableFields.length;
+	renderActiveTable();
+}
+
+/**
+ * Discovers fields and applies session choices, authored defaults, or all fields.
+ *
+ * @returns {void}
+ */
+function initializeTableFields() {
+	state.tableFields = getRowFields({ rows: state.activeData.data });
+	const savedFields = state.tableSelections.get(state.activeDataset.id);
+	const defaults = state.activeData.defaultColumns;
+	const initialFields = savedFields ?? (Array.isArray(defaults) ? new Set(defaults) : null);
+	state.visibleTableFields = new Set();
+
+	for (const field of state.tableFields) {
+		if (!initialFields || initialFields.has(field)) {
+			state.visibleTableFields.add(field);
+		}
+	}
+
+	if (state.visibleTableFields.size === 0) {
+		state.visibleTableFields = new Set(state.tableFields);
+	}
+
+	elements.tableFieldPicker.open = false;
+	elements.tableFieldPicker.hidden = state.tableFields.length === 0;
+	renderTableFields({ container: elements.tableFieldOptions, fields: state.tableFields });
+	updateTableFieldSelection();
+}
+
+/**
+ * Renders selected columns in the dataset's original field order.
+ *
+ * @returns {void}
+ */
+function renderActiveTable() {
+	const columns = [];
+
+	for (const field of state.tableFields) {
+		if (state.visibleTableFields.has(field)) {
+			columns.push(field);
+		}
+	}
+
+	renderTable({
+		table: elements.dataTable,
+		rows: sortTableRows({ rows: state.filteredRows, sourceRows: state.activeData.data, sort: state.tableSort }),
+		columns,
+		sort: state.tableSort,
+		previewLength: state.config.tableCellPreviewLength,
+		emptyValueDisplay: state.config.tableEmptyValueDisplay,
+		booleanValueDisplay: state.config.tableBooleanValueDisplay
+	});
+	const sortedHeader = elements.dataTable.querySelector('th[aria-sort="ascending"], th[aria-sort="descending"]');
+	elements.tableSortStatus.textContent = state.tableSort ? `${sortedHeader.textContent} · ${state.tableSort.direction === "ascending" ? "Ascending" : "Descending"}` : "Source order";
+	elements.resetTableSortButton.disabled = !state.tableSort;
 }
 
 /**
@@ -305,7 +481,9 @@ async function selectDataset({ dataset }) {
 	state.activeData = await loadDataset({ dataset });
 	state.expandedDatasetId = "";
 	state.filteredRows = state.activeData.data;
+	state.tableSort = null;
 	state.chartFields = getDefaultChartFields({ rows: state.activeData.data });
+	initializeTableFields();
 	elements.rowFilter.value = "";
 	updateUrlHash({ datasetId: dataset.id });
 	renderDatasetLists();
@@ -323,20 +501,22 @@ function renderActiveDataset() {
 	const data = state.activeData;
 	const properties = data.properties;
 	const rows = data.data;
+	const source = properties.source ?? dataset.source ?? (state.config.dataMode === "local" ? "Local" : "Remote");
 
 	elements.activeCategory.textContent = dataset.category;
 	elements.activeName.textContent = dataset.name;
 	elements.datasetCount.textContent = `${rows.length} rows`;
 	elements.datasetUpdated.textContent = `Updated ${properties.updated ?? dataset.updated}`;
-	elements.datasetSource.textContent = properties.source ?? dataset.source ?? "Remote";
+	elements.datasetSource.textContent = source;
 	elements.sourceJsonLink.href = getDatasetSourceUrl({ config: state.config, dataset });
 	elements.downloadJsonLink.href = getDatasetCdnUrl({ config: state.config, dataset });
 	elements.downloadJsonLink.download = `${dataset.id}.json`;
 	updateBookmarkButton();
 	resetCopyDatasetLinkButton();
 
-	renderMetadata({
-		container: elements.metadataGrid,
+	renderDatasetOverview({
+		container: elements.datasetDetails,
+		labels: elements.datasetExtraLabels,
 		dataset,
 		data
 	});
@@ -355,10 +535,7 @@ function renderFilteredRows() {
 		query: elements.rowFilter.value
 	});
 	elements.rowFilterCount.textContent = `${state.filteredRows.length} matching rows`;
-	renderTable({
-		table: elements.dataTable,
-		rows: state.filteredRows
-	});
+	renderActiveTable();
 	renderActiveGraph();
 	renderActivePeriodicTable({
 		dataset: state.activeDataset,
@@ -548,7 +725,8 @@ function getActiveDatasetPageUrl() {
  * @returns {string} Public site URL.
  */
 function getConfiguredSiteUrl() {
-	const siteUrl = String(state.config?.siteUrl ?? window.location.href).split("#")[0];
+	const configuredUrl = state.config?.dataMode === "local" ? window.location.href : state.config?.siteUrl;
+	const siteUrl = String(configuredUrl ?? window.location.href).split("#")[0];
 
 	return siteUrl.endsWith("/") ? siteUrl : `${siteUrl}/`;
 }
