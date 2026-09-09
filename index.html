@@ -291,11 +291,12 @@
                     aria-label="Dataset graph"
                 >
                     <div class="graph-controls" id="graph-controls"></div>
+                    <p class="graph-help">Boolean fields use false = 0 and true = 1. False bubbles stay visible at a smaller size.</p>
                     <div class="graph-canvas-wrap">
                         <canvas id="graph-canvas"></canvas>
                     </div>
                     <p class="empty-state" id="graph-empty-state" hidden>
-                        This dataset does not include enough numeric fields to draw a graph.
+                        This dataset does not include enough numeric or boolean fields to draw a graph.
                     </p>
                 </section>
 

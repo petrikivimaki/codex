@@ -11,12 +11,12 @@ const minBubbleRadius = 4;
  * @returns {object} Default field selection.
  */
 export function getDefaultChartFields({ rows }) {
-	const numericFields = getNumericFields({ rows });
+	const graphFields = getGraphFields({ rows });
 
 	return {
-		xField: numericFields[0] ?? "",
-		yField: numericFields[1] ?? "",
-		zField: numericFields[2] ?? ""
+		xField: graphFields[0] ?? "",
+		yField: graphFields[1] ?? "",
+		zField: graphFields[2] ?? ""
 	};
 }
 
@@ -32,25 +32,25 @@ export function getDefaultChartFields({ rows }) {
  * @returns {void}
  */
 export function renderChart({ controls, canvas, emptyState, rows, fields }) {
-	const numericFields = getNumericFields({ rows });
+	const graphFields = getGraphFields({ rows });
 	const selectedFields = normalizeSelectedFields({
 		fields,
-		numericFields
+		graphFields
 	});
 	const chartRows = getChartRows({
 		rows,
 		fields: selectedFields
 	});
-	const canRenderChart = Boolean(window.Chart) && numericFields.length >= 2 && chartRows.length > 0;
+	const canRenderChart = Boolean(window.Chart) && graphFields.length >= 2 && chartRows.length > 0;
 
 	emptyState.textContent = getEmptyStateText({
 		hasChart: Boolean(window.Chart),
-		numericFieldCount: numericFields.length,
+		graphFieldCount: graphFields.length,
 		chartRowCount: chartRows.length
 	});
 	renderChartControls({
 		controls,
-		numericFields,
+		graphFields,
 		fields: selectedFields
 	});
 
@@ -70,13 +70,13 @@ export function renderChart({ controls, canvas, emptyState, rows, fields }) {
 }
 
 /**
- * Gets numeric object keys from dataset rows.
+ * Gets object keys with numeric or boolean values from dataset rows.
  *
  * @param {object} params Parameters.
  * @param {Array<object>} params.rows Dataset rows.
- * @returns {Array<string>} Numeric fields.
+ * @returns {Array<string>} Numeric or boolean fields.
  */
-export function getNumericFields({ rows }) {
+export function getGraphFields({ rows }) {
 	const fieldCounts = new Map();
 
 	for (let rowIndex = 0; rowIndex < rows.length; rowIndex += 1) {
@@ -100,11 +100,11 @@ export function getNumericFields({ rows }) {
  *
  * @param {object} params Parameters.
  * @param {HTMLElement} params.controls Controls container.
- * @param {Array<string>} params.numericFields Numeric fields.
+ * @param {Array<string>} params.graphFields Numeric or boolean fields.
  * @param {object} params.fields Selected fields.
  * @returns {void}
  */
-function renderChartControls({ controls, numericFields, fields }) {
+function renderChartControls({ controls, graphFields, fields }) {
 	const fieldsFragment = document.createDocumentFragment();
 
 	controls.replaceChildren();
@@ -113,7 +113,7 @@ function renderChartControls({ controls, numericFields, fields }) {
 		id: "graph-x-field",
 		name: "xField",
 		label: "X axis",
-		numericFields,
+		graphFields,
 		selectedField: fields.xField,
 		includeEmptyOption: false
 	}));
@@ -121,7 +121,7 @@ function renderChartControls({ controls, numericFields, fields }) {
 		id: "graph-y-field",
 		name: "yField",
 		label: "Y axis",
-		numericFields,
+		graphFields,
 		selectedField: fields.yField,
 		includeEmptyOption: false
 	}));
@@ -129,7 +129,7 @@ function renderChartControls({ controls, numericFields, fields }) {
 		id: "graph-z-field",
 		name: "zField",
 		label: "Bubble size",
-		numericFields,
+		graphFields,
 		selectedField: fields.zField,
 		includeEmptyOption: true
 	}));
@@ -144,12 +144,12 @@ function renderChartControls({ controls, numericFields, fields }) {
  * @param {string} params.id Select ID.
  * @param {string} params.name Select name.
  * @param {string} params.label Select label.
- * @param {Array<string>} params.numericFields Numeric fields.
+ * @param {Array<string>} params.graphFields Numeric or boolean fields.
  * @param {string} params.selectedField Selected field.
  * @param {boolean} params.includeEmptyOption Whether to include a blank option.
  * @returns {HTMLLabelElement} Select label element.
  */
-function createFieldSelect({ id, name, label, numericFields, selectedField, includeEmptyOption }) {
+function createFieldSelect({ id, name, label, graphFields, selectedField, includeEmptyOption }) {
 	const labelElement = document.createElement("label");
 	const labelText = document.createElement("span");
 	const select = document.createElement("select");
@@ -158,7 +158,7 @@ function createFieldSelect({ id, name, label, numericFields, selectedField, incl
 	labelText.textContent = label;
 	select.id = id;
 	select.name = name;
-	select.disabled = numericFields.length === 0 || (!includeEmptyOption && numericFields.length < 2);
+	select.disabled = graphFields.length === 0 || (!includeEmptyOption && graphFields.length < 2);
 
 	if (includeEmptyOption) {
 		select.appendChild(createOption({
@@ -168,8 +168,8 @@ function createFieldSelect({ id, name, label, numericFields, selectedField, incl
 		}));
 	}
 
-	for (let index = 0; index < numericFields.length; index += 1) {
-		const field = numericFields[index];
+	for (let index = 0; index < graphFields.length; index += 1) {
+		const field = graphFields[index];
 		select.appendChild(createOption({
 			value: field,
 			text: toTitleCase(field),
@@ -201,20 +201,20 @@ function createOption({ value, text, isSelected }) {
 }
 
 /**
- * Normalizes selected fields against available numeric fields.
+ * Normalizes selected fields against available numeric or boolean fields.
  *
  * @param {object} params Parameters.
  * @param {object} params.fields Selected fields.
- * @param {Array<string>} params.numericFields Numeric fields.
+ * @param {Array<string>} params.graphFields Numeric or boolean fields.
  * @returns {object} Normalized fields.
  */
-function normalizeSelectedFields({ fields, numericFields }) {
-	const xField = numericFields.includes(fields.xField) ? fields.xField : numericFields[0] ?? "";
-	const yField = numericFields.includes(fields.yField) ? fields.yField : getFallbackYField({
+function normalizeSelectedFields({ fields, graphFields }) {
+	const xField = graphFields.includes(fields.xField) ? fields.xField : graphFields[0] ?? "";
+	const yField = graphFields.includes(fields.yField) ? fields.yField : getFallbackYField({
 		xField,
-		numericFields
+		graphFields
 	});
-	const zField = numericFields.includes(fields.zField) ? fields.zField : "";
+	const zField = graphFields.includes(fields.zField) ? fields.zField : "";
 
 	return { xField, yField, zField };
 }
@@ -224,13 +224,13 @@ function normalizeSelectedFields({ fields, numericFields }) {
  *
  * @param {object} params Parameters.
  * @param {string} params.xField X-axis field.
- * @param {Array<string>} params.numericFields Numeric fields.
+ * @param {Array<string>} params.graphFields Numeric or boolean fields.
  * @returns {string} Fallback field.
  */
-function getFallbackYField({ xField, numericFields }) {
-	for (let index = 0; index < numericFields.length; index += 1) {
-		if (numericFields[index] !== xField) {
-			return numericFields[index];
+function getFallbackYField({ xField, graphFields }) {
+	for (let index = 0; index < graphFields.length; index += 1) {
+		if (graphFields[index] !== xField) {
+			return graphFields[index];
 		}
 	}
 
@@ -265,7 +265,7 @@ function getChartRows({ rows, fields }) {
 			x: xValue,
 			y: yValue,
 			r: fields.zField ? getBubbleRadius({
-				value: getNumericValue(row[fields.zField]),
+				value: row[fields.zField],
 				values: zValues
 			}) : defaultBubbleRadius,
 			raw: row
@@ -468,12 +468,18 @@ function getZValues({ rows, zField }) {
  * Gets a bubble radius scaled from the selected z dimension.
  *
  * @param {object} params Parameters.
- * @param {number} params.value Current value.
+ * @param {unknown} params.value Raw bubble-size value.
  * @param {Array<number>} params.values All z values.
  * @returns {number} Bubble radius.
  */
 function getBubbleRadius({ value, values }) {
-	if (!Number.isFinite(value) || values.length === 0) {
+	if (typeof value === "boolean") {
+		return value ? maxBubbleRadius : minBubbleRadius;
+	}
+
+	const numericValue = getNumericValue(value);
+
+	if (!Number.isFinite(numericValue) || values.length === 0) {
 		return defaultBubbleRadius;
 	}
 
@@ -483,7 +489,7 @@ function getBubbleRadius({ value, values }) {
 		return (minBubbleRadius + maxBubbleRadius) / 2;
 	}
 
-	return minBubbleRadius + ((value - minValue) / (maxValue - minValue)) * (maxBubbleRadius - minBubbleRadius);
+	return minBubbleRadius + ((numericValue - minValue) / (maxValue - minValue)) * (maxBubbleRadius - minBubbleRadius);
 }
 
 /**
@@ -491,21 +497,21 @@ function getBubbleRadius({ value, values }) {
  *
  * @param {object} params Parameters.
  * @param {boolean} params.hasChart Whether Chart.js is available.
- * @param {number} params.numericFieldCount Number of numeric fields.
+ * @param {number} params.graphFieldCount Number of numeric or boolean fields.
  * @param {number} params.chartRowCount Number of plottable rows.
  * @returns {string} Empty state text.
  */
-function getEmptyStateText({ hasChart, numericFieldCount, chartRowCount }) {
+function getEmptyStateText({ hasChart, graphFieldCount, chartRowCount }) {
 	if (!hasChart) {
 		return "The chart library could not be loaded.";
 	}
 
-	if (numericFieldCount < 2) {
-		return "This dataset does not include enough numeric fields to draw a graph.";
+	if (graphFieldCount < 2) {
+		return "This dataset does not include enough numeric or boolean fields to draw a graph.";
 	}
 
 	if (chartRowCount === 0) {
-		return "No matching rows include numeric values for the selected graph fields.";
+		return "No matching rows include numeric or boolean values for the selected graph fields.";
 	}
 
 	return "";
@@ -531,12 +537,16 @@ function getValueRange({ values }) {
 }
 
 /**
- * Gets a finite number from a value.
+ * Converts numbers, numeric strings, and booleans into graph values.
  *
  * @param {unknown} value Raw value.
- * @returns {number} Numeric value.
+ * @returns {number} Numeric value; invalid values are rejected by finite checks.
  */
 function getNumericValue(value) {
+	if (typeof value === "boolean") {
+		return value ? 1 : 0;
+	}
+
 	if (typeof value === "number") {
 		return value;
 	}
