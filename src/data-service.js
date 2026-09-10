@@ -10,7 +10,7 @@ import { getDatasetCdnUrl, getDatasetIndexUrl } from "./config.js";
  */
 export async function loadDatasetIndex({ config }) {
 	const indexUrl = getDatasetIndexUrl({ config });
-	const response = await fetch(indexUrl);
+	const response = await fetch(indexUrl, { cache: "no-cache" });
 
 	if (!response.ok) {
 		throw new Error("Could not load dataset index.");
@@ -37,7 +37,7 @@ export async function loadDatasetIndex({ config }) {
  * @returns {Promise<object>} Full dataset.
  */
 export async function loadDataset({ dataset }) {
-	const response = await fetch(dataset.path);
+	const response = await fetch(dataset.path, { cache: "no-cache" });
 
 	if (!response.ok) {
 		throw new Error(`Could not load ${dataset.name}.`);
@@ -50,6 +50,25 @@ export async function loadDataset({ dataset }) {
 	}
 
 	return data;
+}
+
+/**
+ * Replaces catalog metadata with loaded properties while retaining routing.
+ *
+ * @param {object} params Parameters.
+ * @param {object} params.dataset Resolved catalog entry.
+ * @param {object} params.data Loaded dataset with properties and rows.
+ * @returns {object} Refreshed summary with its actual row count.
+ */
+export function getLoadedDatasetSummary({ dataset, data }) {
+	return {
+		...data.properties,
+		id: dataset.id,
+		path: dataset.path,
+		originalPath: dataset.originalPath,
+		format: data.properties.format ?? dataset.format,
+		size: data.data.length
+	};
 }
 
 /**

@@ -2,7 +2,7 @@ import { sortTableRows } from "./table-sort.js";
 import { renderDatasetOverview } from "./dataset-overview.js";
 import { getDatasetCdnUrl, getDatasetSourceUrl, getRepositoryDataUrl, loadConfig } from "./config.js";
 import { getDefaultChartFields, renderChart } from "./chart-view.js";
-import { filterDatasets, filterRows, findDatasetById, getRowFields, loadDataset, loadDatasetIndex } from "./data-service.js";
+import { filterDatasets, filterRows, findDatasetById, getLoadedDatasetSummary, getRowFields, loadDataset, loadDatasetIndex } from "./data-service.js";
 import { selectElement } from "./dom.js";
 import { hasCoordinateRows, renderMap } from "./map-view.js";
 import { renderPeriodicTable, renderSuggestions, renderTable, renderTableFields, updateTableFields } from "./render.js";
@@ -477,8 +477,18 @@ function previewDataset({ dataset }) {
  * @returns {Promise<void>}
  */
 async function selectDataset({ dataset }) {
-	state.activeDataset = dataset;
-	state.activeData = await loadDataset({ dataset });
+	const data = await loadDataset({ dataset });
+	const summary = getLoadedDatasetSummary({ dataset, data });
+
+	for (let index = 0; index < state.datasets.length; index += 1) {
+		if (state.datasets[index].id === dataset.id) {
+			state.datasets[index] = summary;
+			break;
+		}
+	}
+
+	state.activeDataset = summary;
+	state.activeData = data;
 	state.expandedDatasetId = "";
 	state.filteredRows = state.activeData.data;
 	state.tableSort = null;

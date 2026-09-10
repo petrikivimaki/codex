@@ -257,7 +257,7 @@ function getDatasetDescription({ dataset }) {
 }
 
 /**
- * Gets the dataset size from the generated index.
+ * Gets the dataset size from the catalog or refreshed summary.
  *
  * @param {object} params Parameters.
  * @param {object} params.dataset Dataset summary.

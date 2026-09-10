@@ -1,5 +1,5 @@
 /**
- * Gets concise navigation text from a dataset index entry.
+ * Gets concise navigation text from a catalog or refreshed summary.
  *
  * @param {object} params Parameters.
  * @param {object} params.dataset Dataset summary.
