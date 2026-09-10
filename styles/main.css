@@ -1118,7 +1118,7 @@ h2 {
 	background: var(--color-map-background);
 }
 
-.map-canvas .maplibregl-canvas {
+.map-is-grayscale .maplibregl-canvas {
 	filter: grayscale(100%);
 }
 

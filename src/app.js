@@ -85,7 +85,7 @@ async function startApp() {
 		state.config = await loadConfig();
 		applyBranding({ config: state.config });
 		applyInitialTheme({ config: state.config });
-		applyInitialContentWidth();
+		applyInitialContentWidth({ config: state.config });
 		updateRepositoryLink({ config: state.config });
 		loadBookmarkedDatasetIds();
 		state.datasets = await loadDatasetIndex({ config: state.config });
@@ -592,6 +592,7 @@ function renderActiveMap({ rows }) {
 	const hasMap = hasCoordinateRows({ rows });
 
 	elements.mapSection.hidden = !hasMap;
+	elements.mapSection.classList.toggle("map-is-grayscale", state.config.mapGrayscale !== false);
 	renderMap({
 		container: elements.mapCanvas,
 		emptyState: elements.mapEmptyState,
@@ -854,11 +855,14 @@ function isTheme(value) {
 /**
  * Applies the initial content width preference.
  *
+ * @param {object} params Parameters.
+ * @param {object} params.config Application configuration.
  * @returns {void}
  */
-function applyInitialContentWidth() {
+function applyInitialContentWidth({ config }) {
 	const savedContentWidth = localStorage.getItem(contentWidthStorageKey);
-	const contentWidth = isContentWidth(savedContentWidth) ? savedContentWidth : "full";
+	const defaultContentWidth = isContentWidth(config.defaultContentWidth) ? config.defaultContentWidth : "full";
+	const contentWidth = isContentWidth(savedContentWidth) ? savedContentWidth : defaultContentWidth;
 
 	applyContentWidth({ contentWidth });
 }

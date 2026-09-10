@@ -8,6 +8,8 @@
   "indexPath": "index.json",
   "dataPath": "data",
   "defaultTheme": "light",
+  "defaultContentWidth": "full",
+  "mapGrayscale": true,
   "tableCellPreviewLength": 120,
   "tableEmptyValueDisplay": "icon",
   "tableBooleanValueDisplay": "icon",
