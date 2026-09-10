@@ -691,6 +691,14 @@ h2 {
 	font-size: 13px;
 }
 
+.table-controls:has([aria-invalid="true"]) {
+	border-color: var(--color-red);
+}
+
+.table-controls:has([aria-invalid="true"]) #row-filter-count {
+	color: var(--color-red);
+}
+
 .table-field-picker {
 	margin-bottom: 14px;
 	border: 1px solid var(--color-border);

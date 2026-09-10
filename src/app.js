@@ -1,8 +1,9 @@
 import { sortTableRows } from "./table-sort.js";
+import { createRowSearchIndex, filterRows } from "./table-search.js";
 import { renderDatasetOverview } from "./dataset-overview.js";
 import { getDatasetCdnUrl, getDatasetSourceUrl, getRepositoryDataUrl, loadConfig } from "./config.js";
 import { getDefaultChartFields, renderChart } from "./chart-view.js";
-import { filterDatasets, filterRows, findDatasetById, getLoadedDatasetSummary, getRowFields, loadDataset, loadDatasetIndex } from "./data-service.js";
+import { filterDatasets, findDatasetById, getLoadedDatasetSummary, getRowFields, loadDataset, loadDatasetIndex } from "./data-service.js";
 import { selectElement } from "./dom.js";
 import { hasCoordinateRows, renderMap } from "./map-view.js";
 import { renderPeriodicTable, renderSuggestions, renderTable, renderTableFields, updateTableFields } from "./render.js";
@@ -19,6 +20,7 @@ const state = {
 	expandedDatasetId: "",
 	bookmarkedDatasetIds: new Set(),
 	filteredRows: [],
+	rowSearchIndex: createRowSearchIndex({ rows: [] }),
 	tableFields: [],
 	visibleTableFields: new Set(),
 	tableSelections: new Map(),
@@ -217,6 +219,9 @@ function handleContentWidthToggleClick() {
  * @returns {void}
  */
 function handleRowFilterInput() {
+	if (!state.activeData) {
+		return;
+	}
 	renderFilteredRows();
 }
 
@@ -491,6 +496,7 @@ async function selectDataset({ dataset }) {
 	state.activeData = data;
 	state.expandedDatasetId = "";
 	state.filteredRows = state.activeData.data;
+	state.rowSearchIndex = createRowSearchIndex({ rows: state.activeData.data });
 	state.tableSort = null;
 	state.chartFields = getDefaultChartFields({ rows: state.activeData.data });
 	initializeTableFields();
@@ -540,11 +546,22 @@ function renderActiveDataset() {
  * @returns {void}
  */
 function renderFilteredRows() {
-	state.filteredRows = filterRows({
-		rows: state.activeData?.data ?? [],
-		query: elements.rowFilter.value
-	});
-	elements.rowFilterCount.textContent = `${state.filteredRows.length} matching rows`;
+	try {
+		state.filteredRows = filterRows({ index: state.rowSearchIndex, query: elements.rowFilter.value });
+	} catch (error) {
+		if (!(error instanceof SyntaxError)) {
+			throw error;
+		}
+		elements.rowFilter.setAttribute("aria-invalid", "true");
+		elements.rowFilter.setCustomValidity(error.message);
+		elements.rowFilter.title = error.message;
+		elements.rowFilterCount.textContent = `Invalid filter · ${state.filteredRows.length} previous ${state.filteredRows.length === 1 ? "match" : "matches"}`;
+		return;
+	}
+	elements.rowFilter.removeAttribute("aria-invalid");
+	elements.rowFilter.setCustomValidity("");
+	elements.rowFilter.removeAttribute("title");
+	elements.rowFilterCount.textContent = `${state.filteredRows.length} matching ${state.filteredRows.length === 1 ? "row" : "rows"}`;
 	renderActiveTable();
 	renderActiveGraph();
 	renderActivePeriodicTable({

@@ -252,8 +252,9 @@
                             type="search"
                             autocomplete="off"
                             placeholder="Filter rows"
+                            aria-describedby="row-filter-count"
                         />
-                        <span id="row-filter-count">0 matching rows</span>
+                        <span id="row-filter-count" role="status" aria-live="polite" aria-atomic="true">0 matching rows</span>
                     </div>
 					<details class="table-field-picker" id="table-field-picker" hidden>
 						<summary>

@@ -128,35 +128,6 @@ export function filterDatasets({ datasets, query }) {
 }
 
 /**
- * Filters rows by free text.
- *
- * @param {object} params Parameters.
- * @param {Array<object>} params.rows Dataset rows.
- * @param {string} params.query Search query.
- * @returns {Array<object>} Matching rows.
- */
-export function filterRows({ rows, query }) {
-	const normalizedQuery = query.trim().toLowerCase();
-
-	if (!normalizedQuery) {
-		return rows;
-	}
-
-	const filteredRows = [];
-
-	for (let index = 0; index < rows.length; index += 1) {
-		const row = rows[index];
-		const searchableText = Object.values(row).join(" ").toLowerCase();
-
-		if (searchableText.includes(normalizedQuery)) {
-			filteredRows.push(row);
-		}
-	}
-
-	return filteredRows;
-}
-
-/**
  * Collects fields across the complete dataset in first-seen order.
  *
  * @param {object} params Parameters.
