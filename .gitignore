@@ -3,3 +3,4 @@ ISSUES.md
 data/
 docs/
 index.json
+app-config.local.json

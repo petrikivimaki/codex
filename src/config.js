@@ -1,17 +1,87 @@
 /**
- * Loads application configuration.
+ * Loads application defaults and merges optional local overrides.
  *
  * @async
  * @returns {Promise<object>} Application configuration.
  */
 export async function loadConfig() {
-	const response = await fetch("config/app-config.json");
+	const [defaults, overrides] = await Promise.all([
+		loadConfigFile({ path: "config/app-config.json" }),
+		loadConfigFile({ path: "config/app-config.local.json", optional: true })
+	]);
 
-	if (!response.ok) {
-		throw new Error("Could not load app configuration.");
+	return mergeConfig({ defaults, overrides });
+}
+
+/**
+ * Reads a JSON configuration object, allowing only optional files to be missing.
+ *
+ * @async
+ * @param {object} params Parameters.
+ * @param {string} params.path Configuration URL relative to the app.
+ * @param {boolean} [params.optional=false] Whether HTTP 404 means no overrides.
+ * @returns {Promise<Record<string, unknown>>} Configuration values.
+ */
+async function loadConfigFile({ path, optional = false }) {
+	let response;
+	try {
+		response = await fetch(path, { cache: "no-store" });
+	} catch (cause) {
+		throw new Error(`Could not load configuration ${path}: network request failed.`, { cause });
 	}
 
-	return response.json();
+	if (optional && response.status === 404) {
+		return {};
+	}
+
+	if (!response.ok) {
+		throw new Error(`Could not load configuration ${path}: HTTP ${response.status}.`);
+	}
+
+	let config;
+	try {
+		config = await response.json();
+	} catch (cause) {
+		throw new Error(`Could not parse configuration ${path}: expected valid JSON.`, { cause });
+	}
+
+	if (!isConfigObject(config)) {
+		throw new Error(`Invalid configuration ${path}: expected a JSON object.`);
+	}
+
+	return config;
+}
+
+/**
+ * Merges nested objects; arrays, null, and scalar overrides replace defaults.
+ *
+ * @param {object} params Parameters.
+ * @param {Record<string, unknown>} params.defaults Default values.
+ * @param {Record<string, unknown>} params.overrides Local values.
+ * @returns {Record<string, unknown>} Merged configuration.
+ */
+function mergeConfig({ defaults, overrides }) {
+	const entries = new Map(Object.entries(defaults));
+
+	for (const [key, override] of Object.entries(overrides)) {
+		const defaultValue = entries.get(key);
+		const value = isConfigObject(defaultValue) && isConfigObject(override)
+			? mergeConfig({ defaults: defaultValue, overrides: override })
+			: override;
+		entries.set(key, value);
+	}
+
+	return Object.fromEntries(entries);
+}
+
+/**
+ * Identifies JSON objects eligible for recursive configuration merging.
+ *
+ * @param {unknown} value Parsed JSON value.
+ * @returns {value is Record<string, unknown>} Whether the value is an object.
+ */
+function isConfigObject(value) {
+	return value !== null && typeof value === "object" && !Array.isArray(value);
 }
 
 /**
